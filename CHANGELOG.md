@@ -5,6 +5,36 @@ All notable changes to this project are documented in this file.
 This project adheres to [Conventional Commits](https://www.conventionalcommits.org/)
 and the format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## Unreleased
+
+### 🔒 Security
+
+- Harden git invocation against argument/flag injection: untrusted refs
+  (`--from`/`--to`/`--tag`, config, branch names) are validated and passed after
+  `--end-of-options`, so a value like `--output=...` can no longer be
+  interpreted as a git flag (arbitrary file write).
+- Make the conventional-commit reference parser ReDoS-safe: replaced the
+  backtracking reference regex with a linear two-phase scan. Pathological commit
+  messages that previously took ~20s now complete in <1ms.
+- Validate the GitHub repository slug before building the REST URL / passing it
+  to `gh`, preventing path-traversal and query/fragment injection.
+- Escape link/markup-significant characters in commit subjects so a crafted
+  message can't inject links or raw HTML into changelogs and release notes.
+- Document the config-file execution trust model (JS/TS configs run code) and
+  token handling guidance; prefer `GITHUB_TOKEN`/`GH_TOKEN` over `--token`.
+
+### 🐛 Bug Fixes
+
+- Handle empty / unborn repositories gracefully instead of surfacing a raw
+  `ambiguous argument 'HEAD'` git error.
+
+### 🔧 Chores
+
+- Upgrade `vitest` to v4 to clear 5 moderate (dev-only) advisories; `npm audit`
+  is now clean.
+- Add regression tests for flag injection, ReDoS timing, slug validation,
+  token-not-logged, and empty-repo handling.
+
 ## 0.1.0 (2026-05-22)
 
 ### ✨ Features

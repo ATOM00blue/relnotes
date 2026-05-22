@@ -207,6 +207,34 @@ Set `"hidden": true` to keep a type's commits out of the output entirely.
 
 ---
 
+## 🔒 Security
+
+**Config files can execute code.** A `relnotes.config.{js,mjs,cjs,ts}` file is
+*run* (imported) when relnotes starts — the same trust model as ESLint, Vite,
+Jest, and most JS tooling. relnotes only ever loads config from the directory
+you invoke it in (no upward search, no arbitrary package resolution), so the
+blast radius is the current project. **If you run `relnotes` inside a repository
+you don't trust** (e.g. a freshly cloned PR), review its config first, or use a
+JSON config — `relnotes.config.json`, `.relnotesrc.json`, or
+`package.json#relnotes` are parsed as data and never executed.
+
+**Tokens.** relnotes never logs, prints, or writes your GitHub token: it is only
+ever passed to the `gh` child process via the `GH_TOKEN` environment variable, or
+sent in the `Authorization` header of the GitHub REST request. Prefer
+`GITHUB_TOKEN`/`GH_TOKEN` env vars over `--token`, because anything on the
+command line is visible in the OS process list (`ps`) and your shell history.
+
+**Untrusted git history is handled safely.** Commit messages, refs, and remote
+URLs are treated as untrusted input: git is always invoked with an argument
+array (no shell) and an `--end-of-options` guard so a ref like `--output=...`
+can never be interpreted as a git flag; the conventional-commit parser is
+ReDoS-safe; and commit text is markdown-escaped before it lands in your
+changelog or release notes.
+
+See [`SECURITY_REVIEW.md`](./SECURITY_REVIEW.md) for the full audit.
+
+---
+
 ## 🐙 Publishing a GitHub release
 
 ```bash
@@ -219,9 +247,10 @@ relnotes release --release-version 1.3.0
 
 - **With `gh`:** if the [GitHub CLI](https://cli.github.com/) is installed and
   authenticated, `relnotes` shells out to `gh release create` — no token needed.
-- **Without `gh`:** set `GITHUB_TOKEN` (or pass `--token`) and `relnotes` uses
-  the REST API. The repo slug is auto-detected from your `origin` remote, or
-  pass `--repo owner/name`.
+- **Without `gh`:** set `GITHUB_TOKEN` (or `GH_TOKEN`) and `relnotes` uses the
+  REST API. The repo slug is auto-detected from your `origin` remote, or pass
+  `--repo owner/name`. You *can* also pass `--token`, but prefer the env var:
+  command-line arguments are visible in the process list and shell history.
 
 In CI:
 
