@@ -30,8 +30,8 @@ and the format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### 🔧 Chores
 
-- Upgrade `vitest` to v4 to clear 5 moderate (dev-only) advisories; `npm audit`
-  is now clean.
+- Upgrade `vitest` to v3.2.4 (pulls `vite@7`/`esbuild@0.27`) to clear 5 moderate
+  (dev-only) advisories while keeping Node 18 support; `npm audit` is now clean.
 - Add regression tests for flag injection, ReDoS timing, slug validation,
   token-not-logged, and empty-repo handling.
 

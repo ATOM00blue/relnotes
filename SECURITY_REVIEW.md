@@ -215,9 +215,12 @@ published package (`files: ["dist", ...]`) ships only built output and depends a
 runtime on `commander` + `picocolors`, which are clean. The advisories concern a
 local dev server that relnotes never runs.
 
-**Fix.** Upgraded `vitest` to `^4` (the advisory-clean line), which pulls clean
-`vite`/`esbuild`. `npm audit` is clean after the upgrade. The runtime
-dependencies were left as-is (no CVEs).
+**Fix.** Upgraded `vitest` to `^3.2.4`, which resolves to `vite@7` /
+`esbuild@0.27` — both above the advisory ranges — so `npm audit` is clean.
+vitest `3.2.4` was chosen over `4.x` deliberately: vitest 4 requires Node ≥ 20
+(it imports `node:util#styleText`), which would break the project's documented
+Node 18 support and its CI matrix. The 3.2.4 line still supports Node 18 and is
+advisory-clean. The runtime dependencies were left as-is (no CVEs).
 
 ---
 
