@@ -22,8 +22,22 @@ const HEADER_RE = /^(?<type>[a-zA-Z][\w-]*)(?:\((?<scope>[^()]*)\))?(?<breaking>
 /** Footer trailer: `Token: value` or `Token #value` (git-trailer style). */
 const FOOTER_RE = /^(?<token>BREAKING[ -]CHANGE|[A-Za-z][\w-]*)(?::\s+| #)(?<value>.+)$/;
 
-/** Reference patterns like (#123), #123, GH-123, owner/repo#123. */
-const REFERENCE_RE = /(?:([\w.-]+\/[\w.-]+))?#(\d+)|\bGH-(\d+)\b/gi;
+/**
+ * Reference anchors: `#123` or `GH-123`. Deliberately has NO optional greedy
+ * prefix so it cannot backtrack — see `extractReferences` for how the optional
+ * `owner/repo` prefix is recovered safely (ReDoS-safe, two-phase).
+ */
+const REFERENCE_ANCHOR_RE = /#(\d+)|\bGH-(\d+)\b/gi;
+
+/**
+ * Recovers an `owner/repo` prefix that sits immediately before a `#` anchor.
+ * Run only on a short, bounded slice of text (see `REPO_LOOKBACK`), so the
+ * end-anchored match is O(1) and cannot blow up.
+ */
+const REPO_BEFORE_RE = /([\w.-]+\/[\w.-]+)$/;
+
+/** Max characters to inspect before a `#` when looking for an `owner/repo`. */
+const REPO_LOOKBACK = 600;
 
 /**
  * Parse a single raw commit into a conventional commit structure. Never throws.
@@ -128,16 +142,27 @@ export function parseFooters(body: string): {
   return { notes, breakingNotes };
 }
 
-/** Extract PR/issue references from text. */
+/**
+ * Extract PR/issue references from text.
+ *
+ * ReDoS-safe by construction: phase 1 finds `#`/`GH-` anchors with a regex that
+ * has no optional greedy prefix (so it is linear regardless of input). Phase 2
+ * recovers an optional `owner/repo` prefix by matching an end-anchored regex on
+ * a bounded slice of the text immediately before each `#`. Both phases are
+ * linear in the input length even for adversarial commit messages.
+ */
 export function extractReferences(text: string): CommitReference[] {
   const refs: CommitReference[] = [];
-  REFERENCE_RE.lastIndex = 0;
+  REFERENCE_ANCHOR_RE.lastIndex = 0;
   let m: RegExpExecArray | null;
-  while ((m = REFERENCE_RE.exec(text)) !== null) {
-    const repository = m[1];
-    const hashIssue = m[2];
-    const ghIssue = m[3];
+  while ((m = REFERENCE_ANCHOR_RE.exec(text)) !== null) {
+    const hashIssue = m[1];
+    const ghIssue = m[2];
     if (hashIssue) {
+      const start = Math.max(0, m.index - REPO_LOOKBACK);
+      const before = text.slice(start, m.index);
+      const repoMatch = REPO_BEFORE_RE.exec(before);
+      const repository = repoMatch?.[1];
       refs.push({
         raw: repository ? `${repository}#${hashIssue}` : `#${hashIssue}`,
         issue: hashIssue,

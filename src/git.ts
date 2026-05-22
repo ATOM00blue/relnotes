@@ -35,11 +35,60 @@ async function git(args: string[], cwd: string): Promise<string> {
   }
 }
 
+/**
+ * Validate a user-supplied git ref / range before it reaches git.
+ *
+ * Refs (from `--from`/`--to`/`--tag`, config, branch names) are untrusted. Even
+ * with `execFile` (no shell), git interprets any argument that begins with `-`
+ * as an option, so a value like `--output=<file>` becomes a `git log --output`
+ * flag — an arbitrary-file-write primitive. We both validate here and pass
+ * `--end-of-options` at the call sites (defence in depth).
+ */
+function assertSafeRef(ref: string): void {
+  if (ref.startsWith("-")) {
+    throw new GitError(
+      `Refusing to use a ref/range that looks like an option: ${JSON.stringify(ref)}`,
+    );
+  }
+  // NUL, newlines, and other control characters cannot appear in a valid ref and
+  // signal an injection attempt; reject them outright.
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f]/.test(ref)) {
+    throw new GitError(
+      "Refusing to use a ref/range containing control characters.",
+    );
+  }
+}
+
+/**
+ * Run a git command whose argument list ends in one or more untrusted refs.
+ * `--end-of-options` is inserted immediately before the refs so git treats them
+ * as revisions, never as options. The refs are also validated up front.
+ */
+async function runRefGit(
+  fixedArgs: string[],
+  refs: string[],
+  cwd: string,
+): Promise<string> {
+  for (const r of refs) assertSafeRef(r);
+  return git([...fixedArgs, "--end-of-options", ...refs], cwd);
+}
+
 /** Returns true when cwd is inside a git work tree. */
 export async function isGitRepo(cwd: string): Promise<boolean> {
   try {
     const out = await git(["rev-parse", "--is-inside-work-tree"], cwd);
     return out.trim() === "true";
+  } catch {
+    return false;
+  }
+}
+
+/** Returns true when the repo has at least one commit (HEAD resolves). */
+export async function hasCommits(cwd: string): Promise<boolean> {
+  try {
+    await git(["rev-parse", "--verify", "--quiet", "HEAD"], cwd);
+    return true;
   } catch {
     return false;
   }
@@ -70,7 +119,11 @@ export async function latestTag(
   ref = "HEAD",
 ): Promise<string | null> {
   try {
-    const out = await git(["describe", "--tags", "--abbrev=0", ref], cwd);
+    const out = await runRefGit(
+      ["describe", "--tags", "--abbrev=0"],
+      [ref],
+      cwd,
+    );
     const tag = out.trim();
     return tag || null;
   } catch {
@@ -91,7 +144,13 @@ export async function previousTag(
 
 /** Resolve a ref to a full SHA; throws GitError if it doesn't exist. */
 export async function resolveRef(cwd: string, ref: string): Promise<string> {
-  const out = await git(["rev-parse", "--verify", `${ref}^{commit}`], cwd);
+  // Validate the raw ref, then pass the `^{commit}` peel as the revision so the
+  // leading `--end-of-options` still guards it.
+  assertSafeRef(ref);
+  const out = await git(
+    ["rev-parse", "--verify", "--end-of-options", `${ref}^{commit}`],
+    cwd,
+  );
   return out.trim();
 }
 
@@ -125,11 +184,22 @@ export async function getCommits(
     "%aI", // author date, strict ISO
   ].join(FIELD);
 
-  const range = from ? `${from}..${to}` : to;
-  const args = ["log", `--format=${format}${RECORD}`, range];
-  if (!includeMerges) args.push("--no-merges");
+  // Validate each ref independently before composing the range so the leading
+  // `--end-of-options` (added by runRefGit) reliably guards the revision arg.
+  if (from !== null) assertSafeRef(from);
+  assertSafeRef(to);
 
-  const out = await git(args, cwd);
+  // An unborn HEAD (a repo with zero commits) is not an error — there are simply
+  // no commits to report. Bail out cleanly instead of surfacing git's
+  // "ambiguous argument 'HEAD'" failure.
+  if (to === "HEAD" && !(await hasCommits(cwd))) return [];
+
+  const range = from ? `${from}..${to}` : to;
+
+  const fixedArgs = ["log", `--format=${format}${RECORD}`];
+  if (!includeMerges) fixedArgs.push("--no-merges");
+
+  const out = await runRefGit(fixedArgs, [range], cwd);
   return parseLog(out);
 }
 

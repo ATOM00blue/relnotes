@@ -52,14 +52,28 @@ export function findConfigFile(cwd: string): string | null {
   return null;
 }
 
-/** Read and parse a config file (json or js/mjs/cjs module). */
+/**
+ * Read and parse a config file (json or js/mjs/cjs/ts module).
+ *
+ * SECURITY / TRUST MODEL: a `relnotes.config.{js,mjs,cjs,ts}` file is *executed*
+ * (via dynamic `import`) — this is an intentional, documented feature, and the
+ * same trust model as ESLint, Vite, Jest, etc.: running a tool in a project
+ * implies trusting that project's config. relnotes only ever loads config from
+ * the directory you run it in (see `findConfigFile`/`loadConfig` — no upward
+ * traversal, no resolving arbitrary packages), so the blast radius is bounded to
+ * the current project. If you run relnotes inside an untrusted repository,
+ * inspect its config first, or prefer a JSON config (`relnotes.config.json`,
+ * `.relnotesrc.json`, or `package.json#relnotes`), which is parsed with
+ * `JSON.parse` and never executed.
+ */
 async function readConfigFile(file: string): Promise<UserConfig> {
   const ext = path.extname(file).toLowerCase();
   if (ext === ".json" || file.endsWith(".relnotesrc") || ext === "") {
     const raw = await readFile(file, "utf8");
     return JSON.parse(raw) as UserConfig;
   }
-  // .js / .mjs / .cjs / .ts — import as a module.
+  // .js / .mjs / .cjs / .ts — imported as a module, which EXECUTES it. See the
+  // trust-model note above.
   const mod = (await import(pathToFileURL(file).href)) as {
     default?: UserConfig;
   } & UserConfig;

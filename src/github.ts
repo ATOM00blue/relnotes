@@ -33,6 +33,32 @@ export interface ReleaseResult {
   via: "gh" | "rest";
 }
 
+/**
+ * Validate an `owner/repo` slug before it is interpolated into a URL or passed
+ * to `gh`. The slug can come from `--repo`, config, or a parsed remote URL — all
+ * untrusted. A bad slug (e.g. `../../x`, `o/n?x`, `o/n#x`) could otherwise
+ * redirect the REST request to a different API path or inject query/fragment.
+ * GitHub owner/repo names are restricted to this charset.
+ */
+export function isValidSlug(slug: string): boolean {
+  return /^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(slug);
+}
+
+/**
+ * Reject a value that would be interpreted as an option by `gh` (or contains
+ * control characters). The release tag is passed as a positional argument, so a
+ * tag like `--foo` must not be allowed to become a flag.
+ */
+function assertSafeArg(value: string, what: string): void {
+  if (value.startsWith("-")) {
+    throw new Error(`Refusing to use a ${what} that looks like an option: ${value}`);
+  }
+  // eslint-disable-next-line no-control-regex
+  if (/[\x00-\x1f\x7f]/.test(value)) {
+    throw new Error(`Refusing to use a ${what} containing control characters.`);
+  }
+}
+
 /** Check whether the `gh` CLI is installed and on PATH. */
 export async function hasGhCli(): Promise<boolean> {
   try {
@@ -58,6 +84,8 @@ export async function createRelease(
 
 async function createReleaseViaGh(input: ReleaseInput): Promise<ReleaseResult> {
   const { tag, title, body, draft, prerelease, cwd } = input;
+  // The tag is a positional arg to `gh release create`; never let it look like a flag.
+  assertSafeArg(tag, "tag");
   // Write the body to a temp file to avoid shell-escaping issues with newlines.
   const file = path.join(
     tmpdir(),
@@ -76,7 +104,12 @@ async function createReleaseViaGh(input: ReleaseInput): Promise<ReleaseResult> {
     ];
     if (draft) args.push("--draft");
     if (prerelease) args.push("--prerelease");
-    if (input.repo?.slug) args.push("--repo", input.repo.slug);
+    if (input.repo?.slug) {
+      if (!isValidSlug(input.repo.slug)) {
+        throw new Error(`Invalid repository slug: ${input.repo.slug}`);
+      }
+      args.push("--repo", input.repo.slug);
+    }
 
     const { stdout } = await execFileAsync("gh", args, {
       cwd: cwd ?? process.cwd(),
@@ -109,7 +142,12 @@ async function createReleaseViaRest(
         "Pass --repo <owner/name>.",
     );
   }
+  if (!isValidSlug(repo.slug)) {
+    throw new Error(`Invalid repository slug: ${repo.slug}`);
+  }
 
+  // Slug is validated to the GitHub charset above, so no path/query/fragment
+  // injection is possible here.
   const res = await fetch(
     `https://api.github.com/repos/${repo.slug}/releases`,
     {

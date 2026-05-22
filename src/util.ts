@@ -100,10 +100,15 @@ export function stripV(v: string): string {
   return v.replace(/^v/i, "");
 }
 
-/** Escape characters that would break markdown table/inline formatting minimally. */
+/**
+ * Escape characters in untrusted commit text that would otherwise inject
+ * markdown structure (links/images, raw HTML, code spans, table cells) into the
+ * generated changelog / release notes. Commit subjects and scopes are attacker-
+ * controlled, so a message like `feat: see [x](http://evil)` or one containing
+ * raw `<img ...>` must not produce live markup. Kept minimal to stay readable.
+ */
 export function escapeMarkdown(s: string): string {
-  // Only escape pipe to avoid breaking inline contexts; keep text readable.
-  return s.replace(/\|/g, "\\|");
+  return s.replace(/[\\`*_[\]<>|]/g, "\\$&");
 }
 
 /** Deduplicate an array preserving order, by a key function. */

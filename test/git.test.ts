@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   getCommits,
   getRepoInfo,
+  hasCommits,
   isGitRepo,
   latestTag,
   parseRemoteUrl,
@@ -113,5 +114,28 @@ describe("git integration (temp repo)", () => {
     const result = await generate({ cwd: repo.dir, version: "0.3.0" });
     expect(result.range.from).toBe("v0.2.0");
     expect(result.changelogSection.toLowerCase()).toContain("post-tag feature");
+  });
+});
+
+describe("edge cases: empty / unborn repos", () => {
+  let empty: TempRepo;
+
+  beforeAll(async () => {
+    empty = await TempRepo.create();
+  });
+
+  afterAll(async () => {
+    await empty.cleanup();
+  });
+
+  it("reports no commits for an unborn HEAD instead of throwing", async () => {
+    expect(await hasCommits(empty.dir)).toBe(false);
+    await expect(getCommits(empty.dir, null, "HEAD")).resolves.toEqual([]);
+  });
+
+  it("generate() succeeds on an empty repo", async () => {
+    const result = await generate({ cwd: empty.dir, version: "0.0.0" });
+    expect(result.context.groups).toHaveLength(0);
+    expect(result.context.breaking).toHaveLength(0);
   });
 });

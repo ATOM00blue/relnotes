@@ -44,6 +44,7 @@ export {
   latestTag,
   previousTag,
   isGitRepo,
+  hasCommits,
   parseRemoteUrl,
 } from "./git.js";
 
