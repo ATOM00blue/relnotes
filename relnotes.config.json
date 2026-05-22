@@ -1,0 +1,17 @@
+{
+  "emoji": true,
+  "authors": true,
+  "linkReferences": true,
+  "groupByScope": false,
+  "types": [
+    { "type": "feat", "section": "Features", "emoji": "✨" },
+    { "type": "fix", "section": "Bug Fixes", "emoji": "🐛" },
+    { "type": "perf", "section": "Performance", "emoji": "⚡" },
+    { "type": "refactor", "section": "Refactors", "emoji": "♻️" },
+    { "type": "docs", "section": "Documentation", "emoji": "📝" },
+    { "type": "test", "section": "Tests", "emoji": "✅", "hidden": true },
+    { "type": "build", "section": "Build System", "emoji": "📦", "hidden": true },
+    { "type": "ci", "section": "Continuous Integration", "emoji": "🤖", "hidden": true },
+    { "type": "chore", "section": "Chores", "emoji": "🔧", "hidden": true }
+  ]
+}
