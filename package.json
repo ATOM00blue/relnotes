@@ -1,0 +1,66 @@
+{
+  "name": "relnotes",
+  "version": "0.1.0",
+  "description": "Generate beautiful changelogs and GitHub release notes from your conventional commits.",
+  "keywords": [
+    "changelog",
+    "conventional-commits",
+    "release",
+    "release-notes",
+    "git",
+    "cli",
+    "github",
+    "semver"
+  ],
+  "homepage": "https://github.com/ATOM00blue/relnotes#readme",
+  "bugs": {
+    "url": "https://github.com/ATOM00blue/relnotes/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ATOM00blue/relnotes.git"
+  },
+  "license": "MIT",
+  "author": "ATOM00blue",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/lib.d.ts",
+      "import": "./dist/lib.js",
+      "require": "./dist/lib.cjs"
+    }
+  },
+  "main": "./dist/lib.cjs",
+  "module": "./dist/lib.js",
+  "types": "./dist/lib.d.ts",
+  "bin": {
+    "relnotes": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "commander": "^12.1.0",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
